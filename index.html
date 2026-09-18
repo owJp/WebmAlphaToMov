@@ -1,13 +1,10 @@
-```html
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WebM to MOV Converter</title>
-
-    <!-- Google Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+    <title>WebM Alpha to MOV Converter</title>
+    <link href="[https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap](https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap)" rel="stylesheet">
 
     <style>
         :root { --primary: #2563eb; --bg: #f8fafc; }
@@ -23,169 +20,189 @@
         }
 
         .container {
-            background-white; padding: 2rem; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); max-width: 548px; width: calc(100% - var(--spacing));
+            background-color: #ffffff;
+            padding: 2.5rem;
+            border-radius: 16px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+            max-width: 480px;
+            width: 90%;
+            text-align: center;
         }
 
-        h1 { color: #374151; margin-bottom: 2rem; font-size: 26px;}
+        h1 { margin-top: 0; font-size: 2.5rem; }
 
-        .drop-zone { border-radius: 8px !important; padding-top: 9em !important; text-align: center !important;}
-
-        input[type=file]::file-selector-button {
-            color:white!important;background-color:#4f46e5;border:none;padding:.75rem 1.25rem;font-size:1.063rem;line-height:1.8;text-transform:none;-webkit-appearance:none;cursor:pointer;margin-right: 0px;
+        .drop-zone {
+            border: 2px dashed #6366f1;
+            border-radius: 12px;
+            padding: 2.5rem 1.5rem;
+            background-color: #f8fafc;
+            color: #475569;
+            cursor: pointer;
+            transition: all 0.2s ease;
         }
 
-        .file-input { position:absolute;left:-9999px;top:auto;width:1px;height:1px;overflow:hidden}
+        .drop-zone:hover { background-color: #e0e7ff; border-color: #4f46e5; }
 
-        #drop-area {
-            display:inline-block;padding:.5rem 2.5rem;background-color:#f3f4f6;border-radius:8px;color:#000;font-size:.75rem;cursor:pointer;
-        }
+        .file-input { display: none; }
 
         .btn {
-            display:inline-block;padding:1em 2.5em;margin-top:1.5em;background-color:#4F46E5;border-radius:8px;box-shadow:none;text-decoration:none;font-weight:bold;-webkit-appearance:none;color:white;cursor:pointer;
+            display: none;
+            width: 100%;
+            padding: 0.85rem;
+            margin-top: 1.5rem;
+            background-color: #4f46e5;
+            border: none;
+            border-radius: 8px;
+            color: white;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
         }
 
-        #drop-area:hover, #drop-area:focus-within { background-color:#e0e7ff!important }
+        .btn:hover { background-color: #4338ca; }
+        .btn:disabled { background-color: #9ca3af; cursor: not-allowed; }
 
-        .file-details { text-align:center;margin-top:1rem;padding:.5rem 0;border-top:1px solid rgba(63,64,87,.1);color:#3b4a5d;font-size:.9em;}
+        .file-details {
+            margin-top: 1.25rem;
+            color: #64748b;
+            font-size: 0.875rem;
+        }
 
-        #convert-btn { display:none; margin-left:auto; margin-right:auto; }
+        .error-msg {
+            color: #dc2626;
+            margin-top: 1rem;
+            font-size: 0.875rem;
+            display: none;
+        }
 
-        .loader { border: 2px solid #f3f3f3; border-top: 2px solid var(--primary); border-radius: 50%; width: 20px; height: 20px; animation: spin 1s linear infinite;}
-
-        @keyframes spin { to { transform: rotate(360deg); } }
-
-        .error-msg { color:red; margin-top:1rem; display:none;}
+        .status-msg {
+            color: #2563eb;
+            margin-top: 1rem;
+            font-weight: 600;
+            display: none;
+        }
     </style>
+
+    <!-- Load official FFmpeg WebAssembly build for real client-side conversion -->
+    <script src="[https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js](https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js)"></script>
 </head>
 <body>
 
 <div class="container">
-    <h1><i style="font-size: 48px;">🔄</i></h1>
+    <h1>🔄</h1>
 
-    <!-- Hidden input for file selection -->
-    <input type="file" id="drop-area" class="file-input">
-
-    <!-- Visible Drop Zone -->
-    #drop-area { display:inline-block;padding:.5rem 2.5rem;background-color:#f3f4f6;border-radius:8px;color:#000;font-size:.75rem;cursor:pointer;}
+    <div id="drop-zone" class="drop-zone">
+        <span id="drop-label">Drop a WebM file here or click to browse.</span>
+        <input type="file" id="file-input" class="file-input" accept="video/webm">
+    </div>
 
     <div class="file-details">
-        Drag a WebM file here or click to browse.<br>
-        Conversion happens entirely in your browser.
+        Converts WebM with Alpha channel to Apple ProRes 4444 (MOV).
     </div>
 
     <button id="convert-btn" class="btn">Convert & Download</button>
 
+    <p id="status-msg" class="status-msg"></p>
     <p id="error-msg" class="error-msg"></p>
+</div>
 
-    <!-- Library Script -->
-    <script src="//unpkg.com/webm-to-mov-converter@0.2.1/dist/index.min.js"></script>
+<script>
+    const { createFFmpeg, fetchFile } = FFmpeg;
+    const ffmpeg = createFFmpeg({ log: true });
 
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            const dropArea = document.getElementById('drop-area'); // This is the input, not the div styling wrapper
-            const convertBtn = document.getElementById('convert-btn');
-            const errorMsg = document.getElementById('error-msg');
+    const dropZone = document.getElementById('drop-zone');
+    const fileInput = document.getElementById('file-input');
+    const dropLabel = document.getElementById('drop-label');
+    const convertBtn = document.getElementById('convert-btn');
+    const errorMsg = document.getElementById('error-msg');
+    const statusMsg = document.getElementById('status-msg');
 
-            let selectedFile = null;
+    let selectedFile = null;
 
-            function handleFile(file) {
-                if (file && file.type.startsWith("video/webm")) {
-                    selectedFile = file;
-                    dropArea.textContent = `Selected: ${file.name}`; // Update input text to show selection
+    dropZone.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', (e) => handleFile(e.target.files[0]));
 
-                    // Hide the default "Select files" button styling visually by using a wrapper or just updating style
-                    document.querySelector('.drop-zone').style.display = 'block';
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(evt => {
+        dropZone.addEventListener(evt, (e) => { e.preventDefault(); e.stopPropagation(); });
+    });
 
-                    errorMsg.style.display = 'none';
-                } else {
-                    showError("Please select a valid WebM video file.");
-                }
+    dropZone.addEventListener('drop', (e) => {
+        if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+    });
+
+    function handleFile(file) {
+        if (file && (file.type.includes("webm") || file.name.endsWith('.webm'))) {
+            selectedFile = file;
+            dropLabel.textContent = `Selected: ${file.name}`;
+            errorMsg.style.display = 'none';
+            convertBtn.style.display = 'block';
+        } else {
+            showError("Please select a valid WebM video file.");
+        }
+    }
+
+    convertBtn.addEventListener('click', async () => {
+        if (!selectedFile) return;
+
+        try {
+            convertBtn.disabled = true;
+            showStatus("Loading converter engine (FFmpeg)...");
+
+            if (!ffmpeg.isLoaded()) {
+                await ffmpeg.load();
             }
 
-            // Click to upload logic (maps the drop-area div click to input)
-            const styleWrapper = document.querySelector('.drop-zone'); // The styled wrapper with padding/centering
+            showStatus("Encoding WebM to MOV (ProRes 4444 with Alpha)...");
 
-            if(styleWrapper) {
-                styleWrapper.addEventListener('click', () => {
-                    document.getElementById('drop-area').click();
-                });
-            }
+            const inputName = 'input.webm';
+            const outputName = 'output.mov';
 
-            const input = document.getElementById('drop-area'); // Get the actual file input element
-            input.addEventListener('change', (e) => handleFile(e.target.files[0]));
+            ffmpeg.FS('writeFile', inputName, await fetchFile(selectedFile));
 
-            // Drag and Drop Events - Attached to the wrapper for better UX
-            if(styleWrapper) {
-                ['dragenter', 'dragover'].forEach(eventName => {
-                    styleWrapper.addEventListener(eventName, preventDefaults, false);
-                });
+            // Execute FFmpeg command preserving alpha channel (ProRes 4444 format)
+            await ffmpeg.run(
+                '-i', inputName,
+                '-c:v', 'prores_ks',
+                '-pix_fmt', 'yuva444p10le',
+                outputName
+            );
 
-                function preventDefaults(e) { e.preventDefault(); e.stopPropagation(); }
+            showStatus("Preparing download...");
 
-                ['dragleave', 'drop'].forEach(eventName => {
-                    styleWrapper.addEventListener(eventName, handleDropOrCancel, false);
-                });
+            const data = ffmpeg.FS('readFile', outputName);
+            const blob = new Blob([data.buffer], { type: 'video/quicktime' });
+            const url = URL.createObjectURL(blob);
 
-                function handleDropOrCancel(e) {
-                    if (e.type === 'drop') dropArea.classList.remove('is-dragging'); // Note: is-dragging class not in CSS but logic holds for input visibility check
-                    return;
-                }
-
-                ['dragenter', 'dragover'].forEach(eventName => {
-                    document.body.addEventListener(eventName, preventDefaults, false);
-                });
-
-                function handleDrop(e) { e.preventDefault(); e.stopPropagation(); }
-
-            } // End if block for wrapper logic to avoid errors on older browsers
-
-        })
-
-        // Convert Logic using the library
-        convertBtn.addEventListener('click', async () => {
-            if (!selectedFile) return;
-
-            try {
-                const result = await WebmToMovConverter.convert(selectedFile);
-
-                if (result.success && result.url) {
-                    downloadVideo(result.url);
-                    errorMsg.style.display = 'none';
-
-                    // Optional: Clear file after conversion success to save memory?
-                    selectedFile = null;
-                } else {
-                    showError("Conversion failed.");
-                }
-
-            } catch (error) {
-                console.error(error);
-                showError("An error occurred during conversion: " + error.message);
-            }
-
-        });
-
-        function downloadVideo(url) {
             const a = document.createElement('a');
             a.href = url;
-
-            let fileName = selectedFile.name.replace(/\.[^/.]+$/, "");
-            if (!fileName || fileName.length === 0) {
-                fileName = "converted_video";
-            }
-
-            a.download = `${fileName}.mov`;
-
+            a.download = selectedFile.name.replace(/\.[^/.]+$/, "") + ".mov";
             document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
 
-        // Note: Modern browsers may block automatic programmatic downloads.
-        // The user might need to manually trigger the download if they are in strict privacy mode,
-        // or use a "Save As" prompt if available.
+            showStatus("Done!");
+            convertBtn.disabled = false;
 
-            setTimeout(() => { document.body.removeChild(a); }, 100);
+        } catch (err) {
+            console.error(err);
+            showError("Conversion error: " + err.message);
+            convertBtn.disabled = false;
+            statusMsg.style.display = 'none';
         }
+    });
 
-        function showError(msg) { errorMsg.textContent = msg; errorMsg.style.display = 'block'; }
-    </script>
+    function showError(msg) {
+        errorMsg.textContent = msg;
+        errorMsg.style.display = 'block';
+        statusMsg.style.display = 'none';
+    }
+
+    function showStatus(msg) {
+        statusMsg.textContent = msg;
+        statusMsg.style.display = 'block';
+        errorMsg.style.display = 'none';
+    }
+</script>
 </body>
 </html>
