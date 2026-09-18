@@ -5,9 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>WebM Alpha to MOV Converter</title>
 
-    <!-- AUTOMATIC HEADER FIX FOR GITHUB PAGES -->
-    <script src="https://cdn.jsdelivr.net/gh/gzguidoni/coi-serviceworker@1.2.1/coi-serviceworker.min.js"></script>
-
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
 
     <style>
@@ -51,7 +48,6 @@
             border-color: #4f46e5; 
         }
 
-        /* Prevent child text from capturing clicks or blocking drops */
         .drop-zone * {
             pointer-events: none;
         }
@@ -95,15 +91,14 @@
         }
     </style>
 
-    <!-- FFmpeg WebAssembly -->
-    <script src="https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js"></script>
+    <!-- Single-Threaded FFmpeg WebAssembly (No SharedArrayBuffer / COOP / COEP required) -->
+    <script src="https://unpkg.com/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js"></script>
 </head>
 <body>
 
 <div class="container">
     <h1>🔄</h1>
 
-    <!-- Hidden file input moved OUTSIDE dropzone to prevent event loops -->
     <input type="file" id="file-input" style="display: none;" accept=".webm,video/webm">
 
     <div id="drop-zone" class="drop-zone">
@@ -131,13 +126,11 @@
 
         let selectedFile = null;
 
-        // Open native file picker on click
         dropZone.addEventListener('click', () => {
-            fileInput.value = ''; // Reset input selection
+            fileInput.value = '';
             fileInput.click();
         });
 
-        // Prevent browser default file open behavior
         ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
             window.addEventListener(eventName, (e) => {
                 e.preventDefault();
@@ -145,7 +138,6 @@
             }, false);
         });
 
-        // Highlight drag box
         ['dragenter', 'dragover'].forEach(eventName => {
             dropZone.addEventListener(eventName, () => dropZone.classList.add('dragover'), false);
         });
@@ -154,14 +146,12 @@
             dropZone.addEventListener(eventName, () => dropZone.classList.remove('dragover'), false);
         });
 
-        // Handle file select from browsing
         fileInput.addEventListener('change', (e) => {
             if (e.target.files && e.target.files.length > 0) {
                 handleFile(e.target.files[0]);
             }
         });
 
-        // Handle file select from drag and drop
         dropZone.addEventListener('drop', (e) => {
             const dt = e.dataTransfer;
             if (dt && dt.files && dt.files.length > 0) {
@@ -180,13 +170,16 @@
             }
         }
 
-        // Conversion trigger
         convertBtn.addEventListener('click', async () => {
             if (!selectedFile) return;
 
             try {
                 const { createFFmpeg, fetchFile } = FFmpeg;
-                const ffmpeg = createFFmpeg({ log: true });
+                // Core path pointed explicitly to the single-threaded build
+                const ffmpeg = createFFmpeg({
+                    log: true,
+                    corePath: 'https://unpkg.com/@ffmpeg/core@0.11.0/dist/ffmpeg-core.js'
+                });
 
                 convertBtn.disabled = true;
                 showStatus("Loading converter engine...");
