@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>WebM Alpha to MOV Converter</title>
-    <link href="[https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap](https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap)" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
 
     <style>
         :root { --primary: #2563eb; --bg: #f8fafc; }
@@ -39,9 +39,13 @@
             color: #475569;
             cursor: pointer;
             transition: all 0.2s ease;
+            user-select: none;
         }
 
-        .drop-zone:hover { background-color: #e0e7ff; border-color: #4f46e5; }
+        .drop-zone:hover, .drop-zone.dragover { 
+            background-color: #e0e7ff; 
+            border-color: #4f46e5; 
+        }
 
         .file-input { display: none; }
 
@@ -84,8 +88,8 @@
         }
     </style>
 
-    <!-- Load official FFmpeg WebAssembly build for real client-side conversion -->
-    <script src="[https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js](https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js)"></script>
+    <!-- FFmpeg WebAssembly -->
+    <script src="https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js"></script>
 </head>
 <body>
 
@@ -94,7 +98,8 @@
 
     <div id="drop-zone" class="drop-zone">
         <span id="drop-label">Drop a WebM file here or click to browse.</span>
-        <input type="file" id="file-input" class="file-input" accept="video/webm">
+        <!-- Input placed inside the container with explicit accept filter -->
+        <input type="file" id="file-input" class="file-input" accept=".webm,video/webm">
     </div>
 
     <div class="file-details">
@@ -108,101 +113,132 @@
 </div>
 
 <script>
-    const { createFFmpeg, fetchFile } = FFmpeg;
-    const ffmpeg = createFFmpeg({ log: true });
+    document.addEventListener('DOMContentLoaded', () => {
+        const dropZone = document.getElementById('drop-zone');
+        const fileInput = document.getElementById('file-input');
+        const dropLabel = document.getElementById('drop-label');
+        const convertBtn = document.getElementById('convert-btn');
+        const errorMsg = document.getElementById('error-msg');
+        const statusMsg = document.getElementById('status-msg');
 
-    const dropZone = document.getElementById('drop-zone');
-    const fileInput = document.getElementById('file-input');
-    const dropLabel = document.getElementById('drop-label');
-    const convertBtn = document.getElementById('convert-btn');
-    const errorMsg = document.getElementById('error-msg');
-    const statusMsg = document.getElementById('status-msg');
+        let selectedFile = null;
 
-    let selectedFile = null;
+        // 1. Explicitly handle Click on Dropzone to open file picker
+        dropZone.addEventListener('click', (e) => {
+            fileInput.click();
+        });
 
-    dropZone.addEventListener('click', () => fileInput.click());
-    fileInput.addEventListener('change', (e) => handleFile(e.target.files[0]));
+        // 2. Prevent default drag behaviors on window and zone
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, preventDefaults, false);
+            document.body.addEventListener(eventName, preventDefaults, false);
+        });
 
-    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(evt => {
-        dropZone.addEventListener(evt, (e) => { e.preventDefault(); e.stopPropagation(); });
-    });
-
-    dropZone.addEventListener('drop', (e) => {
-        if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
-    });
-
-    function handleFile(file) {
-        if (file && (file.type.includes("webm") || file.name.endsWith('.webm'))) {
-            selectedFile = file;
-            dropLabel.textContent = `Selected: ${file.name}`;
-            errorMsg.style.display = 'none';
-            convertBtn.style.display = 'block';
-        } else {
-            showError("Please select a valid WebM video file.");
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
         }
-    }
 
-    convertBtn.addEventListener('click', async () => {
-        if (!selectedFile) return;
+        // 3. Visual feedback when dragging over
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropZone.addEventListener(eventName, () => dropZone.classList.add('dragover'), false);
+        });
 
-        try {
-            convertBtn.disabled = true;
-            showStatus("Loading converter engine (FFmpeg)...");
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, () => dropZone.classList.remove('dragover'), false);
+        });
 
-            if (!ffmpeg.isLoaded()) {
-                await ffmpeg.load();
+        // 4. Handle file selection via Click or Drop
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFile(e.target.files[0]);
             }
+        });
 
-            showStatus("Encoding WebM to MOV (ProRes 4444 with Alpha)...");
+        dropZone.addEventListener('drop', (e) => {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            if (files.length > 0) {
+                handleFile(files[0]);
+            }
+        });
 
-            const inputName = 'input.webm';
-            const outputName = 'output.mov';
+        function handleFile(file) {
+            if (file && (file.type.includes("webm") || file.name.endsWith('.webm'))) {
+                selectedFile = file;
+                dropLabel.textContent = `Selected: ${file.name}`;
+                errorMsg.style.display = 'none';
+                convertBtn.style.display = 'block';
+            } else {
+                showError("Please select a valid WebM video file.");
+            }
+        }
 
-            ffmpeg.FS('writeFile', inputName, await fetchFile(selectedFile));
+        // 5. Conversion Logic using FFmpeg.wasm
+        convertBtn.addEventListener('click', async () => {
+            if (!selectedFile) return;
 
-            // Execute FFmpeg command preserving alpha channel (ProRes 4444 format)
-            await ffmpeg.run(
-                '-i', inputName,
-                '-c:v', 'prores_ks',
-                '-pix_fmt', 'yuva444p10le',
-                outputName
-            );
+            try {
+                const { createFFmpeg, fetchFile } = FFmpeg;
+                const ffmpeg = createFFmpeg({ log: true });
 
-            showStatus("Preparing download...");
+                convertBtn.disabled = true;
+                showStatus("Loading converter engine...");
 
-            const data = ffmpeg.FS('readFile', outputName);
-            const blob = new Blob([data.buffer], { type: 'video/quicktime' });
-            const url = URL.createObjectURL(blob);
+                if (!ffmpeg.isLoaded()) {
+                    await ffmpeg.load();
+                }
 
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = selectedFile.name.replace(/\.[^/.]+$/, "") + ".mov";
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
+                showStatus("Encoding WebM to MOV (ProRes 4444)...");
 
-            showStatus("Done!");
-            convertBtn.disabled = false;
+                const inputName = 'input.webm';
+                const outputName = 'output.mov';
 
-        } catch (err) {
-            console.error(err);
-            showError("Conversion error: " + err.message);
-            convertBtn.disabled = false;
+                ffmpeg.FS('writeFile', inputName, await fetchFile(selectedFile));
+
+                await ffmpeg.run(
+                    '-i', inputName,
+                    '-c:v', 'prores_ks',
+                    '-pix_fmt', 'yuva444p10le',
+                    outputName
+                );
+
+                showStatus("Preparing download...");
+
+                const data = ffmpeg.FS('readFile', outputName);
+                const blob = new Blob([data.buffer], { type: 'video/quicktime' });
+                const url = URL.createObjectURL(blob);
+
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = selectedFile.name.replace(/\.[^/.]+$/, "") + ".mov";
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+
+                showStatus("Done!");
+                convertBtn.disabled = false;
+
+            } catch (err) {
+                console.error(err);
+                showError("Conversion error: " + err.message);
+                convertBtn.disabled = false;
+                statusMsg.style.display = 'none';
+            }
+        });
+
+        function showError(msg) {
+            errorMsg.textContent = msg;
+            errorMsg.style.display = 'block';
             statusMsg.style.display = 'none';
         }
+
+        function showStatus(msg) {
+            statusMsg.textContent = msg;
+            statusMsg.style.display = 'block';
+            errorMsg.style.display = 'none';
+        }
     });
-
-    function showError(msg) {
-        errorMsg.textContent = msg;
-        errorMsg.style.display = 'block';
-        statusMsg.style.display = 'none';
-    }
-
-    function showStatus(msg) {
-        statusMsg.textContent = msg;
-        statusMsg.style.display = 'block';
-        errorMsg.style.display = 'none';
-    }
 </script>
 </body>
 </html>
