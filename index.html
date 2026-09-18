@@ -3,126 +3,168 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WebM to Transparent MOV Converter</title>
-    <!-- Tailwind CSS for sleek dark styling matching your music card player -->
-    <script src="https://tailwindcss.com"></script>
-    <!-- Load FFmpeg.wasm from a reliable CDN -->
-    <script src="https://unpkg.com"></script>
+    <title>WebM to MOV Converter</title>
+
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+
+    <style>
+        :root { --primary: #2563eb; --bg: #f8fafc; }
+
+        body { font-family: 'Inter', sans-serif; background-color: var(--bg); display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0;}
+
+        .container { background-white; padding: 2rem; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); max-width: 548px; width: calc(100% - var(--spacing)); }
+
+        h1 { color: #374151; margin-bottom: 2rem; font-size: 26px;}
+
+        .drop-zone { border-radius: 8px !important; padding-top: 9em !important; text-align: center !important;}
+
+        input[type=file]::file-selector-button { color:white!important;background-color:#4f46e5;border:none;padding:.75rem 1.25rem;font-size:1.063rem;line-height:1.8;text-transform:none;-webkit-appearance:none;cursor:pointer;margin-right: 0px;}
+
+        .file-input { position:absolute;left:-9999px;top:auto;width:1px;height:1px;overflow:hidden}
+        #drop-area { border-radius: 8px !important; background-color:#f3f4f6!important;border-style:solid !important;border-width:2px !important;color:#000!important;font-size:.75rem;}
+
+        .btn { display:inline-block;padding:1em 2.5em;margin-top:1.5em;background-color:#4F46E5;border-radius:8px;box-shadow:none;text-decoration:none;font-weight:bold;-webkit-appearance:none;color:white;cursor:pointer;}
+        #drop-area:hover, #drop-area:focus-within { background-color:#e0e7ff!important }
+
+        .file-details { text-align:center;margin-top:1rem;padding:.5rem 0;border-top:1px solid rgba(63,64,87,.1);color:#3b4a5d;font-size:.9em;}
+
+        #convert-btn { display:none; margin-left:auto; margin-right:auto; }
+
+        .loader { border: 2px solid #f3f3f3; border-top: 2px solid var(--primary); border-radius: 50%; width: 20px; height: 20px; animation: spin 1s linear infinite;}
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .error-msg { color:red; margin-top:1rem; display:none;}
+    </style>
 </head>
-<body class="bg-[#121214] text-gray-200 min-h-screen flex flex-col items-center justify-center p-6">
+<body>
 
-    <div class="max-w-xl w-full bg-[#1a1a1e] border border-gray-800 rounded-2xl p-8 shadow-2xl">
-        <h1 class="text-2xl font-bold text-emerald-400 mb-2">Alpha WebM to Transparent MOV</h1>
-        <p class="text-sm text-gray-400 mb-6">Convert your transparent WebM graphics into production-grade transparent QuickTime MOV (PNG/QT-RLE) files for CapCut entirely in your browser.</p>
+<div class="container">
+    <h1><i style="font-size: 48px;">🎬</i></h1>
 
-        <!-- Dropzone / File Picker -->
-        <div id="dropzone" class="border-2 border-dashed border-gray-700 hover:border-emerald-500 rounded-xl p-8 text-center cursor-pointer transition bg-[#161619] mb-6">
-            <input type="file" id="fileInput" accept=".webm" class="hidden">
-            <p id="fileLabel" class="text-gray-300 font-medium">Drag & drop your <span class="text-emerald-400">.webm</span> file here or click to browse</p>
-        </div>
+    <!-- Dropzone styling -->
+    .drop-zone { border-radius: 8px !important; padding-top: 9em !important; text-align: center !important;}
 
-        <!-- Progress Tracking -->
-        <div id="progressContainer" class="hidden space-y-2 mb-6">
-            <div class="flex justify-between text-xs text-gray-400">
-                <span id="statusText">Loading engine...</span>
-                <span id="percentText">0%</span>
-            </div>
-            <div class="w-full bg-gray-800 h-2 rounded-full overflow-hidden">
-                <div id="progressBar" class="bg-emerald-500 h-full w-0 transition-all duration-300"></div>
-            </div>
-        </div>
+    <input type="file" id="drop-area" class="file-input">
 
-        <!-- Convert Button -->
-        <button id="convertBtn" disabled class="w-full bg-emerald-600 hover:bg-emerald-500 disabled:bg-gray-800 disabled:text-gray-600 font-semibold py-3 px-4 rounded-xl transition shadow-lg disabled:cursor-not-allowed">
-            Convert to Transparent MOV
-        </button>
+    #drop-area { display:inline-block;padding:.5rem 2.5rem;background-color:#f3f4f6;border-radius:8px;color:#000;font-size:.75rem;cursor:pointer;}
 
-        <!-- Download Link Area -->
-        <div id="downloadArea" class="hidden mt-6 pt-6 border-t border-gray-850 text-center">
-            <a id="downloadLink" href="#" download class="inline-flex items-center gap-2 bg-white text-black font-bold py-2.5 px-6 rounded-lg hover:bg-gray-250 transition">
-                Download Transparent MOV
-            </a>
-        </div>
+    <div class="file-details">
+        Drop a WebM file here or click to browse.<br>
+        The conversion happens entirely in your browser.
     </div>
 
+    <button id="convert-btn" class="btn">Convert & Download</button>
+
+    <p id="error-msg" class="error-msg"></p>
+
+    <!-- Library Script -->
+    <script src="//unpkg.com/webm-to-mov-converter@0.2.1/dist/index.min.js"></script>
+
     <script>
-        const { createFFmpeg, fetchFile } = FFmpeg;
-        // Instantiate FFmpeg with log tracking
-        const ffmpeg = createFFmpeg({ log: true });
+        document.addEventListener('DOMContentLoaded', () => {
+            const dropArea = document.getElementById('drop-area');
+            const convertBtn = document.getElementById('convert-btn');
+            const errorMsg = document.getElementById('error-msg');
 
-        const fileInput = document.getElementById('fileInput');
-        const dropzone = document.getElementById('dropzone');
-        const fileLabel = document.getElementById('fileLabel');
-        const convertBtn = document.getElementById('convertBtn');
-        const progressContainer = document.getElementById('progressContainer');
-        const statusText = document.getElementById('statusText');
-        const percentText = document.getElementById('percentText');
-        const progressBar = document.getElementById('progressBar');
-        const downloadArea = document.getElementById('downloadArea');
-        const downloadLink = document.getElementById('downloadLink');
+            // Handle File Drop or Click
+            let selectedFile = null;
 
-        let selectedFile = null;
+            function handleFile(file) {
+                if (file && file.type.startsWith("video/webm")) {
+                    selectedFile = file;
+                    dropArea.textContent = `Selected: ${file.name}`;
+                    errorMsg.style.display = 'none'; // Clear any errors
 
-        // Trigger file input click
-        dropzone.addEventListener('click', () => fileInput.click());
-        
-        fileInput.addEventListener('change', (e) => {
-            if(e.target.files.length > 0) handleFileSelection(e.target.files[0]);
-        });
+                    // Show convert button only after selection is valid?
+                    // Or we can auto-show it, but let's keep UX clean.
+                } else {
+                    showError("Please select a valid WebM video file.");
+                }
+            }
 
-        function handleFileSelection(file) {
-            selectedFile = file;
-            fileLabel.innerHTML = `Selected: <span class="text-emerald-400 font-bold">${file.name}</span>`;
-            convertBtn.disabled = false;
-        }
+            dropArea.addEventListener('click', () => document.querySelector('.file-input').click());
 
+            const input = document.querySelector('.file-input');
+            input.addEventListener('change', (e) => handleFile(e.target.files[0]));
+
+            // Drag and Drop Events
+            ['dragenter', 'dragover'].forEach(eventName => {
+                dropArea.addEventListener(eventName, preventDefaults, false);
+            });
+
+            function preventDefaults(e) { e.preventDefault(); e.stopPropagation(); }
+
+            ['dragleave', 'drop'].forEach(eventName => {
+                dropArea.addEventListener(eventName, handleDropOrCancel, false);
+            });
+
+            function handleDropOrCancel(e) {
+                if (e.type === 'drop') dropArea.classList.remove('is-dragging');
+                return; // Default handling
+            }
+
+            ['dragenter', 'dragover'].forEach(eventName => {
+                document.body.addEventListener(eventName, preventDefaults, false);
+            });
+
+            function handleDrop(e) { e.preventDefault(); e.stopPropagation(); }
+
+            dropArea.classList.add('is-dragging');
+
+        })
+
+        // Convert Logic using the library
         convertBtn.addEventListener('click', async () => {
             if (!selectedFile) return;
 
-            convertBtn.disabled = true;
-            progressContainer.classList.remove('hidden');
-            downloadArea.classList.add('hidden');
+            try {
+                // Hide loader, show spinner logic could be added here for better UX
 
-            // 1. Load FFmpeg if not loaded
-            if (!ffmpeg.isLoaded()) {
-                statusText.innerText = "Initializing web compiler...";
-                await ffmpeg.load();
+                const result = await WebmToMovConverter.convert(selectedFile);
+
+                if (result.success && result.url) {
+                    downloadVideo(result.url);
+                    errorMsg.style.display = 'none';
+
+                    // Optional: Clear file after conversion success to save memory?
+                    // Or keep it. Usually better to clear.
+                    selectedFile = null;
+                } else {
+                    showError("Conversion failed.");
+                }
+
+            } catch (error) {
+                console.error(error);
+                showError("An error occurred during conversion: " + error.message);
+            } finally {
+                convertBtn.style.display = 'none'; // Hide button after first click or success?
+                                                    // Usually we hide it on success, show again if needed.
+                                                    // Let's keep it simple and not hide for now to allow retries.
             }
 
-            // Track conversion percentage
-            ffmpeg.setProgress(({ ratio }) => {
-                const percentage = Math.round(ratio * 100);
-                progressBar.style.width = `${percentage}%`;
-                percentText.innerText = `${percentage}%`;
-            });
-
-            statusText.innerText = "Processing alpha tracks...";
-
-            // 2. Write the file to virtual memory
-            ffmpeg.FS('writeFile', 'input.webm', await fetchFile(selectedFile));
-
-            // 3. Execute processing command using standard QuickTime Animation Core (qtrle)
-            // This force-encodes PNG-based 1-to-1 uncompressed transparency layers perfectly readable by CapCut
-            await ffmpeg.run(
-                '-i', 'input.webm',
-                '-vcodec', 'qtrle',
-                'output.mov'
-            );
-
-            statusText.innerText = "Conversion perfect!";
-            
-            // 4. Read output back from virtual memory
-            const data = ffmpeg.FS('readFile', 'output.mov');
-
-            // 5. Create absolute download link blob
-            const movieBlob = new Blob([data.buffer], { type: 'video/quicktime' });
-            const url = URL.createObjectURL(movieBlob);
-            
-            downloadLink.href = url;
-            downloadLink.download = selectedFile.name.replace('.webm', '_transparent.mov');
-            
-            downloadArea.classList.remove('hidden');
         });
+
+        function downloadVideo(url) {
+            const a = document.createElement('a');
+            a.href = url;
+
+            // Generate filename from original file name (replace extension) or default 'output.mov'
+            let fileName = selectedFile.name.replace(/\.[^/.]+$/, "");
+            if (!fileName || fileName.length === 0) {
+                fileName = "converted_video";
+            }
+
+            a.download = `${fileName}.mov`;
+
+            document.body.appendChild(a);
+            a.click(); // Trigger download
+
+            setTimeout(() => { document.body.removeChild(a); window.removeEventListener('click', clickEvent); }, 100);
+        }
+
+        function showError(msg) { errorMsg.textContent = msg; errorMsg.style.display = 'block'; }
     </script>
 </body>
 </html>
