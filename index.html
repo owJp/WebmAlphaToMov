@@ -47,7 +47,10 @@
             border-color: #4f46e5; 
         }
 
-        .file-input { display: none; }
+        /* Prevent child text from capturing clicks or blocking drops */
+        .drop-zone * {
+            pointer-events: none;
+        }
 
         .btn {
             display: none;
@@ -96,10 +99,11 @@
 <div class="container">
     <h1>🔄</h1>
 
+    <!-- Hidden file input moved OUTSIDE dropzone to prevent event loops -->
+    <input type="file" id="file-input" style="display: none;" accept=".webm,video/webm">
+
     <div id="drop-zone" class="drop-zone">
         <span id="drop-label">Drop a WebM file here or click to browse.</span>
-        <!-- Input placed inside the container with explicit accept filter -->
-        <input type="file" id="file-input" class="file-input" accept=".webm,video/webm">
     </div>
 
     <div class="file-details">
@@ -123,23 +127,21 @@
 
         let selectedFile = null;
 
-        // 1. Explicitly handle Click on Dropzone to open file picker
-        dropZone.addEventListener('click', (e) => {
+        // Open native file picker on click
+        dropZone.addEventListener('click', () => {
+            fileInput.value = ''; // Reset input selection
             fileInput.click();
         });
 
-        // 2. Prevent default drag behaviors on window and zone
+        // Prevent browser default file open behavior
         ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-            dropZone.addEventListener(eventName, preventDefaults, false);
-            document.body.addEventListener(eventName, preventDefaults, false);
+            window.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+            }, false);
         });
 
-        function preventDefaults(e) {
-            e.preventDefault();
-            e.stopPropagation();
-        }
-
-        // 3. Visual feedback when dragging over
+        // Highlight drag box
         ['dragenter', 'dragover'].forEach(eventName => {
             dropZone.addEventListener(eventName, () => dropZone.classList.add('dragover'), false);
         });
@@ -148,23 +150,23 @@
             dropZone.addEventListener(eventName, () => dropZone.classList.remove('dragover'), false);
         });
 
-        // 4. Handle file selection via Click or Drop
+        // Handle file select from browsing
         fileInput.addEventListener('change', (e) => {
-            if (e.target.files.length > 0) {
+            if (e.target.files && e.target.files.length > 0) {
                 handleFile(e.target.files[0]);
             }
         });
 
+        // Handle file select from drag and drop
         dropZone.addEventListener('drop', (e) => {
             const dt = e.dataTransfer;
-            const files = dt.files;
-            if (files.length > 0) {
-                handleFile(files[0]);
+            if (dt && dt.files && dt.files.length > 0) {
+                handleFile(dt.files[0]);
             }
         });
 
         function handleFile(file) {
-            if (file && (file.type.includes("webm") || file.name.endsWith('.webm'))) {
+            if (file && (file.type.includes("webm") || file.name.toLowerCase().endsWith('.webm'))) {
                 selectedFile = file;
                 dropLabel.textContent = `Selected: ${file.name}`;
                 errorMsg.style.display = 'none';
@@ -174,7 +176,7 @@
             }
         }
 
-        // 5. Conversion Logic using FFmpeg.wasm
+        // Conversion trigger
         convertBtn.addEventListener('click', async () => {
             if (!selectedFile) return;
 
