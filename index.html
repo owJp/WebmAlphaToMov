@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>WebM Alpha to MOV Converter</title>
 
+    <!-- Enable COOP/COEP Headers dynamically on GitHub Pages -->
+    <script src="https://cdn.jsdelivr.net/gh/gzguidoni/coi-serviceworker@1.2.1/coi-serviceworker.min.js"></script>
+
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
 
     <style>
@@ -112,7 +115,6 @@
     <p id="error-msg" class="error-msg"></p>
 </div>
 
-<!-- Modern ES Module import for FFmpeg v0.12 (No SharedArrayBuffer needed) -->
 <script type="module">
     import { FFmpeg } from 'https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/+esm';
     import { fetchFile, toBlobURL } from 'https://cdn.jsdelivr.net/npm/@ffmpeg/util@0.12.1/+esm';
@@ -181,11 +183,15 @@
 
                 if (!ffmpeg) {
                     ffmpeg = new FFmpeg();
-                    
+
+                    // Convert remote JS worker files to Blob URLs so they bypass CORS worker rules
                     const baseURL = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/esm';
+                    const ffmpegURL = 'https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/esm';
+
                     await ffmpeg.load({
                         coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
                         wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
+                        workerURL: await toBlobURL(`${ffmpegURL}/worker.js`, 'text/javascript')
                     });
                 }
 
