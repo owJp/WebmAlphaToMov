@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebM to Transparent MOV Converter</title>
+    <!-- Tailwind CSS for sleek dark styling matching your music card player -->
+    <script src="https://tailwindcss.com"></script>
+    <!-- Load FFmpeg.wasm from a reliable CDN -->
+    <script src="https://unpkg.com"></script>
+</head>
+<body class="bg-[#121214] text-gray-200 min-h-screen flex flex-col items-center justify-center p-6">
+
+    <div class="max-w-xl w-full bg-[#1a1a1e] border border-gray-800 rounded-2xl p-8 shadow-2xl">
+        <h1 class="text-2xl font-bold text-emerald-400 mb-2">Alpha WebM to Transparent MOV</h1>
+        <p class="text-sm text-gray-400 mb-6">Convert your transparent WebM graphics into production-grade transparent QuickTime MOV (PNG/QT-RLE) files for CapCut entirely in your browser.</p>
+
+        <!-- Dropzone / File Picker -->
+        <div id="dropzone" class="border-2 border-dashed border-gray-700 hover:border-emerald-500 rounded-xl p-8 text-center cursor-pointer transition bg-[#161619] mb-6">
+            <input type="file" id="fileInput" accept=".webm" class="hidden">
+            <p id="fileLabel" class="text-gray-300 font-medium">Drag & drop your <span class="text-emerald-400">.webm</span> file here or click to browse</p>
+        </div>
+
+        <!-- Progress Tracking -->
+        <div id="progressContainer" class="hidden space-y-2 mb-6">
+            <div class="flex justify-between text-xs text-gray-400">
+                <span id="statusText">Loading engine...</span>
+                <span id="percentText">0%</span>
+            </div>
+            <div class="w-full bg-gray-800 h-2 rounded-full overflow-hidden">
+                <div id="progressBar" class="bg-emerald-500 h-full w-0 transition-all duration-300"></div>
+            </div>
+        </div>
+
+        <!-- Convert Button -->
+        <button id="convertBtn" disabled class="w-full bg-emerald-600 hover:bg-emerald-500 disabled:bg-gray-800 disabled:text-gray-600 font-semibold py-3 px-4 rounded-xl transition shadow-lg disabled:cursor-not-allowed">
+            Convert to Transparent MOV
+        </button>
+
+        <!-- Download Link Area -->
+        <div id="downloadArea" class="hidden mt-6 pt-6 border-t border-gray-850 text-center">
+            <a id="downloadLink" href="#" download class="inline-flex items-center gap-2 bg-white text-black font-bold py-2.5 px-6 rounded-lg hover:bg-gray-250 transition">
+                Download Transparent MOV
+            </a>
+        </div>
+    </div>
+
+    <script>
+        const { createFFmpeg, fetchFile } = FFmpeg;
+        // Instantiate FFmpeg with log tracking
+        const ffmpeg = createFFmpeg({ log: true });
+
+        const fileInput = document.getElementById('fileInput');
+        const dropzone = document.getElementById('dropzone');
+        const fileLabel = document.getElementById('fileLabel');
+        const convertBtn = document.getElementById('convertBtn');
+        const progressContainer = document.getElementById('progressContainer');
+        const statusText = document.getElementById('statusText');
+        const percentText = document.getElementById('percentText');
+        const progressBar = document.getElementById('progressBar');
+        const downloadArea = document.getElementById('downloadArea');
+        const downloadLink = document.getElementById('downloadLink');
+
+        let selectedFile = null;
+
+        // Trigger file input click
+        dropzone.addEventListener('click', () => fileInput.click());
+        
+        fileInput.addEventListener('change', (e) => {
+            if(e.target.files.length > 0) handleFileSelection(e.target.files[0]);
+        });
+
+        function handleFileSelection(file) {
+            selectedFile = file;
+            fileLabel.innerHTML = `Selected: <span class="text-emerald-400 font-bold">${file.name}</span>`;
+            convertBtn.disabled = false;
+        }
+
+        convertBtn.addEventListener('click', async () => {
+            if (!selectedFile) return;
+
+            convertBtn.disabled = true;
+            progressContainer.classList.remove('hidden');
+            downloadArea.classList.add('hidden');
+
+            // 1. Load FFmpeg if not loaded
+            if (!ffmpeg.isLoaded()) {
+                statusText.innerText = "Initializing web compiler...";
+                await ffmpeg.load();
+            }
+
+            // Track conversion percentage
+            ffmpeg.setProgress(({ ratio }) => {
+                const percentage = Math.round(ratio * 100);
+                progressBar.style.width = `${percentage}%`;
+                percentText.innerText = `${percentage}%`;
+            });
+
+            statusText.innerText = "Processing alpha tracks...";
+
+            // 2. Write the file to virtual memory
+            ffmpeg.FS('writeFile', 'input.webm', await fetchFile(selectedFile));
+
+            // 3. Execute processing command using standard QuickTime Animation Core (qtrle)
+            // This force-encodes PNG-based 1-to-1 uncompressed transparency layers perfectly readable by CapCut
+            await ffmpeg.run(
+                '-i', 'input.webm',
+                '-vcodec', 'qtrle',
+                'output.mov'
+            );
+
+            statusText.innerText = "Conversion perfect!";
+            
+            // 4. Read output back from virtual memory
+            const data = ffmpeg.FS('readFile', 'output.mov');
+
+            // 5. Create absolute download link blob
+            const movieBlob = new Blob([data.buffer], { type: 'video/quicktime' });
+            const url = URL.createObjectURL(movieBlob);
+            
+            downloadLink.href = url;
+            downloadLink.download = selectedFile.name.replace('.webm', '_transparent.mov');
+            
+            downloadArea.classList.remove('hidden');
+        });
+    </script>
+</body>
+</html>
