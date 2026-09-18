@@ -90,9 +90,6 @@
             display: none;
         }
     </style>
-
-    <!-- Single-Threaded FFmpeg WebAssembly (No SharedArrayBuffer / COOP / COEP required) -->
-    <script src="https://unpkg.com/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js"></script>
 </head>
 <body>
 
@@ -115,7 +112,11 @@
     <p id="error-msg" class="error-msg"></p>
 </div>
 
-<script>
+<!-- Modern ES Module import for FFmpeg v0.12 (No SharedArrayBuffer needed) -->
+<script type="module">
+    import { FFmpeg } from 'https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/+esm';
+    import { fetchFile, toBlobURL } from 'https://cdn.jsdelivr.net/npm/@ffmpeg/util@0.12.1/+esm';
+
     document.addEventListener('DOMContentLoaded', () => {
         const dropZone = document.getElementById('drop-zone');
         const fileInput = document.getElementById('file-input');
@@ -125,6 +126,7 @@
         const statusMsg = document.getElementById('status-msg');
 
         let selectedFile = null;
+        let ffmpeg = null;
 
         dropZone.addEventListener('click', () => {
             fileInput.value = '';
@@ -174,18 +176,17 @@
             if (!selectedFile) return;
 
             try {
-                const { createFFmpeg, fetchFile } = FFmpeg;
-                // Core path pointed explicitly to the single-threaded build
-                const ffmpeg = createFFmpeg({
-                    log: true,
-                    corePath: 'https://unpkg.com/@ffmpeg/core@0.11.0/dist/ffmpeg-core.js'
-                });
-
                 convertBtn.disabled = true;
                 showStatus("Loading converter engine...");
 
-                if (!ffmpeg.isLoaded()) {
-                    await ffmpeg.load();
+                if (!ffmpeg) {
+                    ffmpeg = new FFmpeg();
+                    
+                    const baseURL = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/esm';
+                    await ffmpeg.load({
+                        coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
+                        wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
+                    });
                 }
 
                 showStatus("Encoding WebM to MOV (ProRes 4444)...");
@@ -193,18 +194,18 @@
                 const inputName = 'input.webm';
                 const outputName = 'output.mov';
 
-                ffmpeg.FS('writeFile', inputName, await fetchFile(selectedFile));
+                await ffmpeg.writeFile(inputName, await fetchFile(selectedFile));
 
-                await ffmpeg.run(
+                await ffmpeg.exec([
                     '-i', inputName,
                     '-c:v', 'prores_ks',
                     '-pix_fmt', 'yuva444p10le',
                     outputName
-                );
+                ]);
 
                 showStatus("Preparing download...");
 
-                const data = ffmpeg.FS('readFile', outputName);
+                const data = await ffmpeg.readFile(outputName);
                 const blob = new Blob([data.buffer], { type: 'video/quicktime' });
                 const url = URL.createObjectURL(blob);
 
