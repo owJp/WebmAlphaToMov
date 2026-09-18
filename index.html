@@ -1,3 +1,4 @@
+```html
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -11,20 +12,38 @@
     <style>
         :root { --primary: #2563eb; --bg: #f8fafc; }
 
-        body { font-family: 'Inter', sans-serif; background-color: var(--bg); display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0;}
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+        }
 
-        .container { background-white; padding: 2rem; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); max-width: 548px; width: calc(100% - var(--spacing)); }
+        .container {
+            background-white; padding: 2rem; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); max-width: 548px; width: calc(100% - var(--spacing));
+        }
 
         h1 { color: #374151; margin-bottom: 2rem; font-size: 26px;}
 
         .drop-zone { border-radius: 8px !important; padding-top: 9em !important; text-align: center !important;}
 
-        input[type=file]::file-selector-button { color:white!important;background-color:#4f46e5;border:none;padding:.75rem 1.25rem;font-size:1.063rem;line-height:1.8;text-transform:none;-webkit-appearance:none;cursor:pointer;margin-right: 0px;}
+        input[type=file]::file-selector-button {
+            color:white!important;background-color:#4f46e5;border:none;padding:.75rem 1.25rem;font-size:1.063rem;line-height:1.8;text-transform:none;-webkit-appearance:none;cursor:pointer;margin-right: 0px;
+        }
 
         .file-input { position:absolute;left:-9999px;top:auto;width:1px;height:1px;overflow:hidden}
-        #drop-area { border-radius: 8px !important; background-color:#f3f4f6!important;border-style:solid !important;border-width:2px !important;color:#000!important;font-size:.75rem;}
 
-        .btn { display:inline-block;padding:1em 2.5em;margin-top:1.5em;background-color:#4F46E5;border-radius:8px;box-shadow:none;text-decoration:none;font-weight:bold;-webkit-appearance:none;color:white;cursor:pointer;}
+        #drop-area {
+            display:inline-block;padding:.5rem 2.5rem;background-color:#f3f4f6;border-radius:8px;color:#000;font-size:.75rem;cursor:pointer;
+        }
+
+        .btn {
+            display:inline-block;padding:1em 2.5em;margin-top:1.5em;background-color:#4F46E5;border-radius:8px;box-shadow:none;text-decoration:none;font-weight:bold;-webkit-appearance:none;color:white;cursor:pointer;
+        }
+
         #drop-area:hover, #drop-area:focus-within { background-color:#e0e7ff!important }
 
         .file-details { text-align:center;margin-top:1rem;padding:.5rem 0;border-top:1px solid rgba(63,64,87,.1);color:#3b4a5d;font-size:.9em;}
@@ -41,18 +60,17 @@
 <body>
 
 <div class="container">
-    <h1><i style="font-size: 48px;">🎬</i></h1>
+    <h1><i style="font-size: 48px;">🔄</i></h1>
 
-    <!-- Dropzone styling -->
-    .drop-zone { border-radius: 8px !important; padding-top: 9em !important; text-align: center !important;}
-
+    <!-- Hidden input for file selection -->
     <input type="file" id="drop-area" class="file-input">
 
+    <!-- Visible Drop Zone -->
     #drop-area { display:inline-block;padding:.5rem 2.5rem;background-color:#f3f4f6;border-radius:8px;color:#000;font-size:.75rem;cursor:pointer;}
 
     <div class="file-details">
-        Drop a WebM file here or click to browse.<br>
-        The conversion happens entirely in your browser.
+        Drag a WebM file here or click to browse.<br>
+        Conversion happens entirely in your browser.
     </div>
 
     <button id="convert-btn" class="btn">Convert & Download</button>
@@ -64,54 +82,62 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            const dropArea = document.getElementById('drop-area');
+            const dropArea = document.getElementById('drop-area'); // This is the input, not the div styling wrapper
             const convertBtn = document.getElementById('convert-btn');
             const errorMsg = document.getElementById('error-msg');
 
-            // Handle File Drop or Click
             let selectedFile = null;
 
             function handleFile(file) {
                 if (file && file.type.startsWith("video/webm")) {
                     selectedFile = file;
-                    dropArea.textContent = `Selected: ${file.name}`;
-                    errorMsg.style.display = 'none'; // Clear any errors
+                    dropArea.textContent = `Selected: ${file.name}`; // Update input text to show selection
 
-                    // Show convert button only after selection is valid?
-                    // Or we can auto-show it, but let's keep UX clean.
+                    // Hide the default "Select files" button styling visually by using a wrapper or just updating style
+                    document.querySelector('.drop-zone').style.display = 'block';
+
+                    errorMsg.style.display = 'none';
                 } else {
                     showError("Please select a valid WebM video file.");
                 }
             }
 
-            dropArea.addEventListener('click', () => document.querySelector('.file-input').click());
+            // Click to upload logic (maps the drop-area div click to input)
+            const styleWrapper = document.querySelector('.drop-zone'); // The styled wrapper with padding/centering
 
-            const input = document.querySelector('.file-input');
-            input.addEventListener('change', (e) => handleFile(e.target.files[0]));
-
-            // Drag and Drop Events
-            ['dragenter', 'dragover'].forEach(eventName => {
-                dropArea.addEventListener(eventName, preventDefaults, false);
-            });
-
-            function preventDefaults(e) { e.preventDefault(); e.stopPropagation(); }
-
-            ['dragleave', 'drop'].forEach(eventName => {
-                dropArea.addEventListener(eventName, handleDropOrCancel, false);
-            });
-
-            function handleDropOrCancel(e) {
-                if (e.type === 'drop') dropArea.classList.remove('is-dragging');
-                return; // Default handling
+            if(styleWrapper) {
+                styleWrapper.addEventListener('click', () => {
+                    document.getElementById('drop-area').click();
+                });
             }
 
-            ['dragenter', 'dragover'].forEach(eventName => {
-                document.body.addEventListener(eventName, preventDefaults, false);
-            });
+            const input = document.getElementById('drop-area'); // Get the actual file input element
+            input.addEventListener('change', (e) => handleFile(e.target.files[0]));
 
-            function handleDrop(e) { e.preventDefault(); e.stopPropagation(); }
+            // Drag and Drop Events - Attached to the wrapper for better UX
+            if(styleWrapper) {
+                ['dragenter', 'dragover'].forEach(eventName => {
+                    styleWrapper.addEventListener(eventName, preventDefaults, false);
+                });
 
-            dropArea.classList.add('is-dragging');
+                function preventDefaults(e) { e.preventDefault(); e.stopPropagation(); }
+
+                ['dragleave', 'drop'].forEach(eventName => {
+                    styleWrapper.addEventListener(eventName, handleDropOrCancel, false);
+                });
+
+                function handleDropOrCancel(e) {
+                    if (e.type === 'drop') dropArea.classList.remove('is-dragging'); // Note: is-dragging class not in CSS but logic holds for input visibility check
+                    return;
+                }
+
+                ['dragenter', 'dragover'].forEach(eventName => {
+                    document.body.addEventListener(eventName, preventDefaults, false);
+                });
+
+                function handleDrop(e) { e.preventDefault(); e.stopPropagation(); }
+
+            } // End if block for wrapper logic to avoid errors on older browsers
 
         })
 
@@ -120,8 +146,6 @@
             if (!selectedFile) return;
 
             try {
-                // Hide loader, show spinner logic could be added here for better UX
-
                 const result = await WebmToMovConverter.convert(selectedFile);
 
                 if (result.success && result.url) {
@@ -129,7 +153,6 @@
                     errorMsg.style.display = 'none';
 
                     // Optional: Clear file after conversion success to save memory?
-                    // Or keep it. Usually better to clear.
                     selectedFile = null;
                 } else {
                     showError("Conversion failed.");
@@ -138,10 +161,6 @@
             } catch (error) {
                 console.error(error);
                 showError("An error occurred during conversion: " + error.message);
-            } finally {
-                convertBtn.style.display = 'none'; // Hide button after first click or success?
-                                                    // Usually we hide it on success, show again if needed.
-                                                    // Let's keep it simple and not hide for now to allow retries.
             }
 
         });
@@ -150,7 +169,6 @@
             const a = document.createElement('a');
             a.href = url;
 
-            // Generate filename from original file name (replace extension) or default 'output.mov'
             let fileName = selectedFile.name.replace(/\.[^/.]+$/, "");
             if (!fileName || fileName.length === 0) {
                 fileName = "converted_video";
@@ -159,9 +177,12 @@
             a.download = `${fileName}.mov`;
 
             document.body.appendChild(a);
-            a.click(); // Trigger download
 
-            setTimeout(() => { document.body.removeChild(a); window.removeEventListener('click', clickEvent); }, 100);
+        // Note: Modern browsers may block automatic programmatic downloads.
+        // The user might need to manually trigger the download if they are in strict privacy mode,
+        // or use a "Save As" prompt if available.
+
+            setTimeout(() => { document.body.removeChild(a); }, 100);
         }
 
         function showError(msg) { errorMsg.textContent = msg; errorMsg.style.display = 'block'; }
