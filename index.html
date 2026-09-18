@@ -116,8 +116,8 @@
 </div>
 
 <script type="module">
-    import { FFmpeg } from 'https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/+esm';
-    import { fetchFile, toBlobURL } from 'https://cdn.jsdelivr.net/npm/@ffmpeg/util@0.12.1/+esm';
+    import { FFmpeg } from './ffmpeg.js';
+    import { fetchFile } from 'https://cdn.jsdelivr.net/npm/@ffmpeg/util@0.12.1/+esm';
 
     document.addEventListener('DOMContentLoaded', () => {
         const dropZone = document.getElementById('drop-zone');
@@ -184,14 +184,11 @@
                 if (!ffmpeg) {
                     ffmpeg = new FFmpeg();
 
-                    // Convert remote JS worker files to Blob URLs so they bypass CORS worker rules
-                    const baseURL = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/esm';
-                    const ffmpegURL = 'https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/esm';
-
+                    // Load worker locally from your repo, but fetch heavy core files from CDN
                     await ffmpeg.load({
-                        coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
-                        wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
-                        workerURL: await toBlobURL(`${ffmpegURL}/worker.js`, 'text/javascript')
+                        workerURL: './ffmpeg-worker.js',
+                        coreURL: 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/esm/ffmpeg-core.js',
+                        wasmURL: 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/esm/ffmpeg-core.wasm'
                     });
                 }
 
